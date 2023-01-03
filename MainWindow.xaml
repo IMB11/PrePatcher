@@ -1,0 +1,17 @@
+﻿<Window x:Class="MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:PrePatcher"
+        mc:Ignorable="d"
+        Title="MainWindow" Height="450" Width="800">
+    <Grid>
+        <Border CornerRadius="6" BorderBrush="Gray" Background="LightGray" BorderThickness="2" DockPanel.Dock="Top" Margin="10,10,10,10">
+            <StackPanel Name="ImagePanel" Drop="ImagePanel_Drop" AllowDrop="true" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <Label Name="LogInfo"  Content="Drop .apk file here." HorizontalContentAlignment="Center" VerticalContentAlignment="Center" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="22"/>
+
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>
