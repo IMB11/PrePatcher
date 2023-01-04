@@ -12,6 +12,6 @@ Download the latest release, unzip it into a folder and run `PrePatcher.exe` - d
 
 After the APK is patched, you must do the following specified by the google document manually:
 
-> 1) Install all of the GearVR services, from the APKs. This is required so that Beat Saber can launch.
+1) Install all of the GearVR services, from the APKs. This is required so that Beat Saber can launch.
 2) Run QuestPatcher, patch the APK for modding on the emulator/device.
-> 2.5) If you're patching beat saber, you can install the complimentary "AndroidHelper" mod found here: https://drive.google.com/file/d/1109L1XXtbH1taAP3X2WsmbbWub0X2TXI/view?usp=sharing
+3) *If you're patching beat saber, you can install the complimentary "AndroidHelper" mod found here: https://drive.google.com/file/d/1109L1XXtbH1taAP3X2WsmbbWub0X2TXI/view?usp=sharing*
