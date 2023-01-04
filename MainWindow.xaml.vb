@@ -1,19 +1,25 @@
 ﻿Imports System.IO
 Imports System.IO.Compression
 Imports System.Text
+Imports System.Threading
 Imports AssetsTools.NET
 Imports AssetsTools.NET.Extra
 
 Class MainWindow
-    Private Sub ImagePanel_Drop(sender As Object, e As DragEventArgs)
+    Public Property TextBoxWriter As ConsoleTextBoxWriter
+    Public Property RunningThread As Thread
+
+    Private Sub DropPanel_Drop(sender As Object, e As DragEventArgs)
         If e.Data.GetDataPresent(DataFormats.FileDrop) Then
             Dim files As String() = e.Data.GetData(DataFormats.FileDrop)
-            HandleFileOpen(files(0))
+            RunningThread = New Thread(Sub() HandleFileOpen(files(0)))
+            RunningThread.Start()
         End If
     End Sub
 
     Private Sub HandleFileOpen(v As String)
-        ImagePanel.AllowDrop = False
+        DropPanel.AllowDrop = False
+        DropPanel.IsEnabled = False
         Log("Attempting to open apk.")
 
         Dim extension = Path.GetExtension(v)
@@ -27,6 +33,8 @@ Class MainWindow
 
         Dim tempDir = Directory.CreateDirectory("./" & filename_noext)
         ZipFile.ExtractToDirectory(v, "./" & filename_noext)
+
+        Log("Extracted .apk to ./temp-apk-unzipped")
 
         Dim bootConfigPath = Path.Combine("./" & filename_noext, "assets", "bin", "Data", "boot.config")
 
@@ -45,13 +53,13 @@ Class MainWindow
         Dim globalGameManagersPath = Path.Combine("./" & filename_noext, "assets", "bin", "Data", "globalgamemanagers")
 
 
-        Log("Loading globalgamemanagers")
+        Log("Loading globalgamemanagers@BuildSettings")
 
         Dim globalGameManagers = am.LoadAssetsFile(globalGameManagersPath, False)
         am.LoadClassDatabaseFromPackage(globalGameManagers.file.typeTree.unityVersion)
         Dim buildSettingsInst = globalGameManagers.table.GetAssetsOfType(AssetClassID.BuildSettings).First()
 
-        Log("Replacing enabledVrDevices with empty vector")
+        Log("Replacing globalgamemanagers@BuildSettings@enabledVrDevices with empty vector")
         Dim buildSettings = globalGameManagers.table.GetAssetsOfType(AssetClassID.BuildSettings).First
         Dim buildSettingsBase = am.GetTypeInstance(globalGameManagers.file, buildSettings).GetBaseField()
         Dim enabledVRDevices = buildSettingsBase.Get("enabledVRDevices").Get("Array")
@@ -60,7 +68,7 @@ Class MainWindow
 
         Dim repl = New AssetsReplacerFromMemory(0, buildSettingsInst.index, buildSettingsInst.curFileType, &HFFFF, buildSettingsBase.WriteToByteArray())
 
-        Dim stream = File.OpenWrite("globalgamemanagers.assets")
+        Dim stream = File.OpenWrite("globalgamemanagers-modified")
         Dim writer = New AssetsFileWriter(stream)
         Dim lAR = New List(Of AssetsReplacer)()
         lAR.Add(repl)
@@ -68,16 +76,40 @@ Class MainWindow
         writer.Close()
         stream.Close()
 
-        Log("Completed")
+        File.Copy("globalgamemanagers-modified", globalGameManagersPath, True)
 
-        Log("Extracted .apk to ./temp-apk-unzipped")
+        Log("Patched globalgamemanagers@BuildSettings@enabledVrDevices")
+
+        Log("Replacing libovrplatformloader.so")
+
+        Dim libOvrPath = Path.Combine("./" & filename_noext, "lib", "arm64-v8a", "libovrplatformloader.so")
+
+        File.Copy("libovrplatformloader.so", libOvrPath, True)
+
+        Log("Replaced libovrplatformloader.so")
+
+        Log("Rebuilding .apk")
+
+        ZipFile.CreateFromDirectory("./" & filename_noext, filename_noext & "_unsigned.apk")
+
+        Log("Signing .apk")
+
+        Dim apkSignerJar = New Process()
+        apkSignerJar.StartInfo.UseShellExecute = False
+        apkSignerJar.StartInfo.FileName = "java"
+        apkSignerJar.StartInfo.Arguments = "-jar uber-apk-signer -a " & filename_noext & "_unsigned.apk" & " --out " & filename_noext & "_patched.apk"
+        apkSignerJar.Start()
+
+        Log("Saving .apk to " & filename_noext & "_patched.apk")
+
+        Log("Completed!")
 
         Cleanup()
     End Sub
 
     Private Sub Cleanup()
-        ImagePanel.AllowDrop = True
-        Log("Drop .apk file here.")
+        DropPanel.AllowDrop = True
+        DropPanel.IsEnabled = True
         Try
             Directory.Delete("./temp-apk-unzipped")
         Catch ex As Exception
@@ -86,6 +118,10 @@ Class MainWindow
     End Sub
 
     Private Sub Log(v As String)
-        LogInfo.Content = v
+        Console.WriteLine("> " & v)
+    End Sub
+
+    Private Sub OnWindowLoaded(sender As Object, e As RoutedEventArgs)
+        TextBoxWriter = New ConsoleTextBoxWriter(LogBox)
     End Sub
 End Class
