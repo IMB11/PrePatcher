@@ -5,10 +5,10 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:PrePatcher"
         mc:Ignorable="d"
-        Title="MainWindow" Height="450" Width="800" Loaded="OnWindowLoaded">
+        Title="PrePatcher" Height="450" Width="800" Loaded="OnWindowLoaded">
     <Grid>
         <Button Name="DropPanel" Content="Select Or Drop .apk Here" AllowDrop="True" Drop="DropPanel_Drop" HorizontalAlignment="Center" Margin="0,10,0,0" VerticalAlignment="Top" Height="60" Width="780" FontSize="16"/>
-        <TextBox Name="LogBox" HorizontalAlignment="Center" Margin="0,105,0,0" TextWrapping="Wrap" Text="> Started PrePatcher - waiting for input." VerticalAlignment="Top" Width="780" Height="319" IsReadOnly="True" IsUndoEnabled="False" FontFamily="Consolas"/>
+        <TextBox Name="LogBox" HorizontalAlignment="Center" Margin="0,105,0,0" TextWrapping="Wrap" Text="Started PrePatcher - waiting for input.&#xD;&#xA;" VerticalAlignment="Top" Width="780" Height="319" IsReadOnly="True" IsUndoEnabled="False" FontFamily="Consolas"/>
         <Label Content="Logs" HorizontalAlignment="Center" VerticalAlignment="Top" Height="25" Width="780" FontSize="11" Margin="0,75,0,0"/>
     </Grid>
 </Window>

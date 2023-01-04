@@ -1,9 +1,9 @@
 ﻿Imports System.IO
 Imports System.IO.Compression
-Imports System.Text
 Imports System.Threading
 Imports AssetsTools.NET
 Imports AssetsTools.NET.Extra
+Imports Microsoft.Win32
 
 Class MainWindow
     Public Property TextBoxWriter As ConsoleTextBoxWriter
@@ -18,9 +18,12 @@ Class MainWindow
     End Sub
 
     Private Sub HandleFileOpen(v As String)
-        DropPanel.AllowDrop = False
-        DropPanel.IsEnabled = False
-        Log("Attempting to open apk.")
+        Me.Dispatcher.Invoke(Sub()
+                                 DropPanel.AllowDrop = False
+                                 DropPanel.IsEnabled = False
+                             End Sub)
+
+        Console.WriteLine("Attempting to open file as APK.")
 
         Dim extension = Path.GetExtension(v)
         Dim filename_noext = Path.GetFileNameWithoutExtension(v)
@@ -31,10 +34,12 @@ Class MainWindow
             Exit Sub
         End If
 
+        Console.WriteLine("Extracting " & filename_noext & ".apk to ./" & filename_noext)
+
         Dim tempDir = Directory.CreateDirectory("./" & filename_noext)
         ZipFile.ExtractToDirectory(v, "./" & filename_noext)
 
-        Log("Extracted .apk to ./temp-apk-unzipped")
+        Console.WriteLine("Extracted " & filename_noext & ".apk to ./" & filename_noext)
 
         Dim bootConfigPath = Path.Combine("./" & filename_noext, "assets", "bin", "Data", "boot.config")
 
@@ -45,7 +50,7 @@ Class MainWindow
 
         File.WriteAllText(bootConfigPath, bootConfigContents)
 
-        Log("Patched boot.config")
+        Console.WriteLine("Patched boot.config")
 
         Dim am = New AssetsManager()
         am.LoadClassPackage("classdata.tpk")
@@ -53,13 +58,13 @@ Class MainWindow
         Dim globalGameManagersPath = Path.Combine("./" & filename_noext, "assets", "bin", "Data", "globalgamemanagers")
 
 
-        Log("Loading globalgamemanagers@BuildSettings")
+        Console.WriteLine("Loading globalgamemanagers@BuildSettings")
 
         Dim globalGameManagers = am.LoadAssetsFile(globalGameManagersPath, False)
         am.LoadClassDatabaseFromPackage(globalGameManagers.file.typeTree.unityVersion)
         Dim buildSettingsInst = globalGameManagers.table.GetAssetsOfType(AssetClassID.BuildSettings).First()
 
-        Log("Replacing globalgamemanagers@BuildSettings@enabledVrDevices with empty vector")
+        Console.WriteLine("Replacing globalgamemanagers@BuildSettings@enabledVrDevices with empty vector")
         Dim buildSettings = globalGameManagers.table.GetAssetsOfType(AssetClassID.BuildSettings).First
         Dim buildSettingsBase = am.GetTypeInstance(globalGameManagers.file, buildSettings).GetBaseField()
         Dim enabledVRDevices = buildSettingsBase.Get("enabledVRDevices").Get("Array")
@@ -76,40 +81,53 @@ Class MainWindow
         writer.Close()
         stream.Close()
 
+        am.UnloadAll()
+
         File.Copy("globalgamemanagers-modified", globalGameManagersPath, True)
 
-        Log("Patched globalgamemanagers@BuildSettings@enabledVrDevices")
+        Console.WriteLine("Patched globalgamemanagers@BuildSettings@enabledVrDevices")
 
-        Log("Replacing libovrplatformloader.so")
+        Console.WriteLine("Replacing libovrplatformloader.so")
 
         Dim libOvrPath = Path.Combine("./" & filename_noext, "lib", "arm64-v8a", "libovrplatformloader.so")
 
         File.Copy("libovrplatformloader.so", libOvrPath, True)
 
-        Log("Replaced libovrplatformloader.so")
+        Console.WriteLine("Replaced libovrplatformloader.so")
 
-        Log("Rebuilding .apk")
+        Console.WriteLine("Rebuilding " & filename_noext & ".apk (this may take a while)")
 
-        ZipFile.CreateFromDirectory("./" & filename_noext, filename_noext & "_unsigned.apk")
+        File.Delete(filename_noext & ".apk")
+        ZipFile.CreateFromDirectory("./" & filename_noext, filename_noext & ".apk")
 
-        Log("Signing .apk")
+        Console.WriteLine("Signing " & filename_noext & ".apk (this may take a while)")
 
-        Dim apkSignerJar = New Process()
-        apkSignerJar.StartInfo.UseShellExecute = False
-        apkSignerJar.StartInfo.FileName = "java"
-        apkSignerJar.StartInfo.Arguments = "-jar uber-apk-signer -a " & filename_noext & "_unsigned.apk" & " --out " & filename_noext & "_patched.apk"
-        apkSignerJar.Start()
+        Dim apkSigner As Process = New Process()
+        apkSigner.StartInfo.UseShellExecute = False
+        apkSigner.StartInfo.CreateNoWindow = True
+        apkSigner.StartInfo.RedirectStandardError = True
+        apkSigner.StartInfo.RedirectStandardOutput = True
+        apkSigner.StartInfo.FileName = "java"
+        apkSigner.StartInfo.Arguments = "-jar ./uber-apk-signer.jar -a " & filename_noext & ".apk"
 
-        Log("Saving .apk to " & filename_noext & "_patched.apk")
+        AddHandler apkSigner.OutputDataReceived, New DataReceivedEventHandler(Sub(s, e) Console.WriteLine(e.Data))
+        AddHandler apkSigner.ErrorDataReceived, New DataReceivedEventHandler(Sub(s, e) Console.WriteLine(e.Data))
 
-        Log("Completed!")
+        apkSigner.Start()
+        apkSigner.BeginErrorReadLine()
+        apkSigner.BeginOutputReadLine()
+        apkSigner.WaitForExit()
+
+        Console.WriteLine("Completed!")
 
         Cleanup()
     End Sub
 
     Private Sub Cleanup()
-        DropPanel.AllowDrop = True
-        DropPanel.IsEnabled = True
+        Me.Dispatcher.Invoke(Sub()
+                                 DropPanel.AllowDrop = True
+                                 DropPanel.IsEnabled = True
+                             End Sub)
         Try
             Directory.Delete("./temp-apk-unzipped")
         Catch ex As Exception
@@ -117,11 +135,17 @@ Class MainWindow
         End Try
     End Sub
 
-    Private Sub Log(v As String)
-        Console.WriteLine("> " & v)
+    Private Sub OnWindowLoaded(sender As Object, e As RoutedEventArgs)
+        TextBoxWriter = New ConsoleTextBoxWriter(LogBox, Me.Dispatcher)
     End Sub
 
-    Private Sub OnWindowLoaded(sender As Object, e As RoutedEventArgs)
-        TextBoxWriter = New ConsoleTextBoxWriter(LogBox)
+    Private Sub DropPanel_Click(sender As Object, e As RoutedEventArgs) Handles DropPanel.Click
+        Dim dlg As OpenFileDialog = New OpenFileDialog()
+        dlg.Filter = "APK Files (*.apk)|*.apk|All files (*.*)|*.*"
+
+        If dlg.ShowDialog() Then
+            RunningThread = New Thread(Sub() HandleFileOpen(dlg.FileName))
+            RunningThread.Start()
+        End If
     End Sub
 End Class

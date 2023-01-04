@@ -1,14 +1,17 @@
 ﻿Imports System.IO
 Imports System.Text
+Imports System.Windows.Threading
 
 Public Class ConsoleTextBoxWriter
     Inherits TextWriter
 
     Private textBox As TextBox
+    Private dispatcher As Dispatcher
 
-    Public Sub New(ByVal textBox As TextBox)
+    Public Sub New(ByVal textBox As TextBox, ByRef dispatcher As Dispatcher)
         Console.SetOut(Me)
         Me.textBox = textBox
+        Me.dispatcher = dispatcher
     End Sub
 
     Public Overrides ReadOnly Property Encoding As Encoding
@@ -26,6 +29,9 @@ Public Class ConsoleTextBoxWriter
     End Sub
 
     Private Sub WriteImp(ByVal value As String)
-        textBox.AppendText(value)
+        dispatcher.Invoke(Sub()
+                              textBox.AppendText(value)
+                              textBox.ScrollToEnd()
+                          End Sub)
     End Sub
 End Class
